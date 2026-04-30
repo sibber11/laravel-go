@@ -1,0 +1,78 @@
+{
+  "name": "laravelgo",
+  "displayName": "LaravelGo",
+  "description": "Browse related files for Laravel models — migrations, factories, resources, and more.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.116.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:php"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "model-related-files.showMenu",
+        "title": "Model: Show Related Files"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "model-related-files.showMenu",
+          "when": "editorLangId == php",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "LaravelGo",
+      "properties": {
+        "modelRelatedFiles.buttonPosition": {
+          "type": "string",
+          "enum": ["after-class", "end-of-line"],
+          "default": "after-class",
+          "description": "Where to display the inline Related Files button."
+        },
+        "modelRelatedFiles.openInSplit": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open related files in a split editor to the right."
+        },
+        "modelRelatedFiles.searchDirectories": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [".", "./components", ".."],
+          "description": "Additional directories to search for related files."
+        },
+        "modelRelatedFiles.filePatterns": {
+          "type": "object",
+          "default": {},
+          "description": "Custom file patterns mapping extension to description."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.116.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.56.1",
+    "eslint": "^9.39.3",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
