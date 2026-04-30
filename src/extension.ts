@@ -1,13 +1,22 @@
 import * as vscode from 'vscode';
 import { ModelCodeLensProvider } from './codeLensProvider';
+import { ControllerIndexer } from './controllerIndexer';
+import { InertiaDefinitionProvider } from './inertiaDefinitionProvider';
+import { InertiaDiagnosticProvider } from './inertiaDiagnosticProvider';
+import { VueLensProvider } from './vueLensProvider';
 import { findRelatedFiles } from './fileLocator';
 import { hasModelsNamespace, parseModels } from './modelParser';
 
 export function activate(context: vscode.ExtensionContext) {
     const output = vscode.window.createOutputChannel('LaravelGo');
-    const codeLensProvider = new ModelCodeLensProvider();
 
-    const command = vscode.commands.registerCommand(
+    const modelLensProvider = new ModelCodeLensProvider();
+    const controllerIndexer = new ControllerIndexer();
+    const vueLensProvider = new VueLensProvider(controllerIndexer);
+    const inertiaDefProvider = new InertiaDefinitionProvider();
+    const inertiaDiagnostics = new InertiaDiagnosticProvider();
+
+    const showMenuCommand = vscode.commands.registerCommand(
         'model-related-files.showMenu',
         async (args?: { className: string; tableName: string }) => {
             try {
@@ -63,11 +72,22 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         output,
-        codeLensProvider,
-        command,
+        modelLensProvider,
+        controllerIndexer,
+        vueLensProvider,
+        inertiaDiagnostics,
+        showMenuCommand,
         vscode.languages.registerCodeLensProvider(
             { language: 'php', scheme: 'file' },
-            codeLensProvider
+            modelLensProvider
+        ),
+        vscode.languages.registerCodeLensProvider(
+            { language: 'vue', scheme: 'file' },
+            vueLensProvider
+        ),
+        vscode.languages.registerDefinitionProvider(
+            { language: 'php', scheme: 'file' },
+            inertiaDefProvider
         ),
     );
 }

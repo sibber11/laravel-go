@@ -10,7 +10,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:php"
+    "onLanguage:php",
+    "onLanguage:vue"
   ],
   "main": "./out/extension.js",
   "contributes": {
