@@ -1,4 +1,18 @@
+import { log } from 'console';
 import * as vscode from 'vscode';
+
+import { Parser, Language, Query } from "web-tree-sitter";
+
+export async function initializeParser(): Promise<{ parser: Parser, language: Language }> {
+    await Parser.init();
+    const parser = new Parser();
+    // load the language from the extension's bundled WASM file
+    const path = vscode.extensions.getExtension('blinkerboy.laravelgo')?.extensionPath;
+    const uri = vscode.Uri.joinPath(vscode.Uri.file(path!), 'tree-sitter-php_only.wasm');
+    const language = await Language.load(uri.fsPath);
+    parser.setLanguage(language);
+    return { parser, language };
+}
 
 export interface ControllerRef {
     uri: vscode.Uri;
@@ -14,9 +28,11 @@ export class ControllerIndexer implements vscode.Disposable {
 
     private readonly watcher: vscode.FileSystemWatcher;
     private indexPromise: Promise<void> | null = null;
+    private parser!: Parser;
+    private language!: Language;
 
     constructor() {
-        this.watcher = vscode.workspace.createFileSystemWatcher('**/app/**/*.php');
+        this.watcher = vscode.workspace.createFileSystemWatcher('**/app/Http/Controllers/**/*.php');
         this.watcher.onDidChange(uri => this.reindexFile(uri));
         this.watcher.onDidCreate(uri => this.reindexFile(uri));
         this.watcher.onDidDelete(uri => {
@@ -33,7 +49,10 @@ export class ControllerIndexer implements vscode.Disposable {
     }
 
     private async buildFullIndex(): Promise<void> {
-        const uris = await vscode.workspace.findFiles('**/app/**/*.php', null);
+        const uris = await vscode.workspace.findFiles('**/app/Http/Controllers/**/*.php', null);
+        const { parser, language } = await initializeParser();
+        this.parser = parser;
+        this.language = language;
         await Promise.all(uris.map(uri => this.indexFile(uri)));
         this._onDidUpdate.fire();
     }
@@ -59,45 +78,36 @@ export class ControllerIndexer implements vscode.Disposable {
     private async indexFile(uri: vscode.Uri): Promise<void> {
         try {
             const bytes = await vscode.workspace.fs.readFile(uri);
-            const lines = Buffer.from(bytes).toString('utf8').split('\n');
+            const content = new TextDecoder('utf-8').decode(bytes);
+            const tree = this.parser.parse(content);
+            const query = new Query(this.language, `
+                (class_declaration
+                    name: (name) @class.name
+                    body: (declaration_list
+                        (method_declaration (name) @method.name
+                            body: (compound_statement
+                                (return_statement
+                                    (scoped_call_expression
+                                    scope: (name) @scope.name (#eq? @scope.name "Inertia")
+                                    name: (name) @scope.method (#eq? @scope.method "render")
+                                    arguments: (arguments (argument (string (string_content) @component.name)) )
+                                )
+                                )
+                            )
+                        )
+                    ) 
+                )`);
+            const matches = query.matches(tree!.rootNode);
+            matches.forEach((match) => {
+                const className = match.captures.find(c => c.name === 'class.name')?.node.text;
+                const methodName = match.captures.find(c => c.name === 'method.name')?.node.text;
+                const componentName = match.captures.find(c => c.name === 'component.name')?.node.text;
 
-            let currentClass = '';
-            let currentMethod = '';
-            let pendingRenderLine = -1; // line where Inertia::render( had no inline string
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-
-                const classMatch = line.match(/class\s+(\w+)/);
-                if (classMatch) { currentClass = classMatch[1]; }
-
-                const methodMatch = line.match(/(?:public|protected|private)\s+function\s+(\w+)/);
-                if (methodMatch) { currentMethod = methodMatch[1]; }
-
-                // Resolve pending multiline render — next bare string line is the component
-                if (pendingRenderLine >= 0) {
-                    const bareMatch = line.match(/^\s*['"]([^'"]+)['"]/);
-                    if (bareMatch && currentClass && currentMethod) {
-                        this.recordComponent(bareMatch[1], uri, pendingRenderLine, currentClass, currentMethod);
-                    }
-                    pendingRenderLine = -1;
-                    continue;
+                if (className && methodName && componentName) {
+                    const line = match.captures.find(c => c.name === 'component.name')!.node.startPosition.row;
+                    this.recordComponent(componentName, uri, line, className, methodName);
                 }
-
-                // Same-line: inertia('X') or Inertia::render('X')
-                const sameLineMatch = line.match(/(?:\binertia\s*\(|Inertia::render\s*\()\s*['"]([^'"]+)['"]/);
-                if (sameLineMatch) {
-                    if (currentClass && currentMethod) {
-                        this.recordComponent(sameLineMatch[1], uri, i, currentClass, currentMethod);
-                    }
-                    continue;
-                }
-
-                // render( with no string yet — string is on next line
-                if (/(?:\binertia\s*\(|Inertia::render\s*\()/.test(line)) {
-                    pendingRenderLine = i;
-                }
-            }
+            });
         } catch {
             // skip unreadable files
         }
