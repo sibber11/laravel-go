@@ -3,6 +3,7 @@ import { ModelCodeLensProvider } from './codeLensProvider';
 import { ControllerIndexer } from './controllerIndexer';
 import { InertiaDefinitionProvider } from './inertiaDefinitionProvider';
 import { InertiaDiagnosticProvider } from './inertiaDiagnosticProvider';
+import { InertiaDocumentLinkProvider } from './inertiaDocumentLinkProvider';
 import { VueLensProvider } from './vueLensProvider';
 import { findRelatedFiles } from './fileLocator';
 import { hasModelsNamespace, parseModels } from './modelParser';
@@ -14,6 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
     const controllerIndexer = new ControllerIndexer();
     const vueLensProvider = new VueLensProvider(controllerIndexer);
     const inertiaDefProvider = new InertiaDefinitionProvider();
+    const inertiaDocumentLinkProvider = new InertiaDocumentLinkProvider();
     const inertiaDiagnostics = new InertiaDiagnosticProvider();
 
     const showMenuCommand = vscode.commands.registerCommand(
@@ -88,6 +90,10 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.languages.registerDefinitionProvider(
             { language: 'php', scheme: 'file' },
             inertiaDefProvider
+        ),
+        vscode.languages.registerDocumentLinkProvider(
+            { language: 'php', scheme: 'file' },
+            inertiaDocumentLinkProvider
         ),
     );
 }

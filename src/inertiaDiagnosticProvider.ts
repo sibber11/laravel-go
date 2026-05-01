@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import { parseInertiaComponents } from './inertiaParser';
+import { extractInertiaComponents, resolveComponentFileUri, getComponentRange } from './inertiaUtil';
 
 export class InertiaDiagnosticProvider implements vscode.Disposable {
     private readonly collection = vscode.languages.createDiagnosticCollection('laravelgo-inertia');
@@ -48,28 +47,29 @@ export class InertiaDiagnosticProvider implements vscode.Disposable {
         const folder = vscode.workspace.getWorkspaceFolder(document.uri);
         if (!folder) { return; }
 
-        const components = parseInertiaComponents(document);
+        const matches = await extractInertiaComponents(document);
         const diagnostics: vscode.Diagnostic[] = [];
 
-        for (const { component, range } of components) {
-            const parts = component.split('/');
-            if (parts.length < 2) { continue; }
-
-            const [module, ...rest] = parts;
-            const fileUri = vscode.Uri.file(
-                path.join(folder.uri.fsPath, 'resources', 'js', module, 'Pages', ...rest) + '.vue'
-            );
+        for (const match of matches) {
+            const fileUri = resolveComponentFileUri(match.componentName, folder.uri.fsPath);
 
             try {
                 await vscode.workspace.fs.stat(fileUri);
             } catch {
                 const rel = vscode.workspace.asRelativePath(fileUri);
+                const range = getComponentRange(document, match);
                 const diag = new vscode.Diagnostic(
                     range,
-                    `Inertia component not found: ${rel}`,
+                    `Inertia component not found`,
                     vscode.DiagnosticSeverity.Error,
                 );
                 diag.source = 'LaravelGo';
+                diag.relatedInformation = [
+                    new vscode.DiagnosticRelatedInformation(
+                        new vscode.Location(fileUri, new vscode.Position(0, 0)),
+                        `Expected location: ${rel}`,
+                    ),
+                ];
                 diagnostics.push(diag);
             }
         }

@@ -1,17 +1,22 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { parseInertiaComponents } from './inertiaParser';
+import { extractInertiaComponents, getComponentRange } from './inertiaUtil';
 
 export class InertiaDefinitionProvider implements vscode.DefinitionProvider {
     async provideDefinition(
         document: vscode.TextDocument,
         position: vscode.Position,
     ): Promise<vscode.Location | null> {
-        const hit = parseInertiaComponents(document).find(c => c.range.contains(position));
+        const matches = await extractInertiaComponents(document);
+
+        const hit = matches.find(m => {
+            const range = getComponentRange(document, m);
+            return range.contains(position);
+        });
         if (!hit) { return null; }
 
-        const offsetInString = position.character - hit.range.start.character;
-        return this.handleSegment(hit.component, offsetInString, document, position);
+        const offsetInString = position.character;
+        return this.handleSegment(hit.componentName, offsetInString, document, position);
     }
 
     private async handleSegment(
