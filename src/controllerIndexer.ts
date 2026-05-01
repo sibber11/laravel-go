@@ -1,8 +1,14 @@
 import * as vscode from 'vscode';
 
-export interface ControllerRef {
+import { Parser, Language } from "web-tree-sitter";
+import { initializeParser, extractComponentsFromPhp } from './phpParserUtil';
+
+export interface ComponentSource {
     uri: vscode.Uri;
     line: number;
+}
+
+export interface ControllerRef extends ComponentSource {
     className: string;
     methodName: string;
 }
@@ -14,9 +20,11 @@ export class ControllerIndexer implements vscode.Disposable {
 
     private readonly watcher: vscode.FileSystemWatcher;
     private indexPromise: Promise<void> | null = null;
+    private parser!: Parser;
+    private language!: Language;
 
     constructor() {
-        this.watcher = vscode.workspace.createFileSystemWatcher('**/app/**/*.php');
+        this.watcher = vscode.workspace.createFileSystemWatcher('**/app/Http/Controllers/**/*.php');
         this.watcher.onDidChange(uri => this.reindexFile(uri));
         this.watcher.onDidCreate(uri => this.reindexFile(uri));
         this.watcher.onDidDelete(uri => {
@@ -33,7 +41,10 @@ export class ControllerIndexer implements vscode.Disposable {
     }
 
     private async buildFullIndex(): Promise<void> {
-        const uris = await vscode.workspace.findFiles('**/app/**/*.php', null);
+        const uris = await vscode.workspace.findFiles('**/app/Http/Controllers/**/*.php', null);
+        const { parser, language } = await initializeParser();
+        this.parser = parser;
+        this.language = language;
         await Promise.all(uris.map(uri => this.indexFile(uri)));
         this._onDidUpdate.fire();
     }
@@ -59,45 +70,13 @@ export class ControllerIndexer implements vscode.Disposable {
     private async indexFile(uri: vscode.Uri): Promise<void> {
         try {
             const bytes = await vscode.workspace.fs.readFile(uri);
-            const lines = Buffer.from(bytes).toString('utf8').split('\n');
-
-            let currentClass = '';
-            let currentMethod = '';
-            let pendingRenderLine = -1; // line where Inertia::render( had no inline string
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-
-                const classMatch = line.match(/class\s+(\w+)/);
-                if (classMatch) { currentClass = classMatch[1]; }
-
-                const methodMatch = line.match(/(?:public|protected|private)\s+function\s+(\w+)/);
-                if (methodMatch) { currentMethod = methodMatch[1]; }
-
-                // Resolve pending multiline render — next bare string line is the component
-                if (pendingRenderLine >= 0) {
-                    const bareMatch = line.match(/^\s*['"]([^'"]+)['"]/);
-                    if (bareMatch && currentClass && currentMethod) {
-                        this.recordComponent(bareMatch[1], uri, pendingRenderLine, currentClass, currentMethod);
-                    }
-                    pendingRenderLine = -1;
-                    continue;
+            const content = new TextDecoder('utf-8').decode(bytes);
+            const matches = await extractComponentsFromPhp(content, this.parser, this.language);
+            matches.forEach((match) => {
+                if (match.className && match.methodName) {
+                    this.recordComponent(match.componentName, uri, match.line, match.className, match.methodName);
                 }
-
-                // Same-line: inertia('X') or Inertia::render('X')
-                const sameLineMatch = line.match(/(?:\binertia\s*\(|Inertia::render\s*\()\s*['"]([^'"]+)['"]/);
-                if (sameLineMatch) {
-                    if (currentClass && currentMethod) {
-                        this.recordComponent(sameLineMatch[1], uri, i, currentClass, currentMethod);
-                    }
-                    continue;
-                }
-
-                // render( with no string yet — string is on next line
-                if (/(?:\binertia\s*\(|Inertia::render\s*\()/.test(line)) {
-                    pendingRenderLine = i;
-                }
-            }
+            });
         } catch {
             // skip unreadable files
         }

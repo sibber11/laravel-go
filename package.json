@@ -1,5 +1,6 @@
 {
   "name": "laravelgo",
+  "publisher": "blinkerboy",
   "displayName": "LaravelGo",
   "description": "Browse related files for Laravel models — migrations, factories, resources, and more.",
   "version": "0.0.1",
@@ -35,7 +36,10 @@
       "properties": {
         "modelRelatedFiles.buttonPosition": {
           "type": "string",
-          "enum": ["after-class", "end-of-line"],
+          "enum": [
+            "after-class",
+            "end-of-line"
+          ],
           "default": "after-class",
           "description": "Where to display the inline Related Files button."
         },
@@ -46,8 +50,14 @@
         },
         "modelRelatedFiles.searchDirectories": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": [".", "./components", ".."],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".",
+            "./components",
+            ".."
+          ],
           "description": "Additional directories to search for related files."
         },
         "modelRelatedFiles.filePatterns": {
@@ -67,13 +77,17 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.116.0",
+    "@types/emscripten": "^1.41.5",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.56.1",
+    "@types/vscode": "^1.116.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.39.3",
     "typescript": "^5.9.3",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "typescript-eslint": "^8.56.1"
+  },
+  "dependencies": {
+    "web-tree-sitter": "^0.26.8"
   }
 }
