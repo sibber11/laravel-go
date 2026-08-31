@@ -104,6 +104,92 @@ Component strings omit the `Pages` directory segment. LaravelGo inserts it autom
 
 ---
 
+## Installation
+
+The extension is not on the Marketplace yet. Pick one of the three ways below.
+
+Common prerequisites for all three:
+
+```bash
+git clone <repo-url> laravel-go
+cd laravel-go
+npm install
+npm run compile     # builds out/ — the extension will not load without it
+```
+
+> `out/` is gitignored, so `npm run compile` is mandatory on a fresh clone.
+
+---
+
+### A — Extension Development Host (try it, no install)
+
+Open the repo folder in VS Code and press **F5**.
+
+A second VS Code window ("Extension Development Host") launches with LaravelGo loaded. Open a Laravel project in that window to test.
+
+- Fastest way to poke at it.
+- Nothing is installed — the extension exists only while that window is open.
+- Reload the dev host with `Cmd+R` / `Ctrl+R` after recompiling.
+
+---
+
+### B — Package and install a `.vsix` (real install)
+
+```bash
+npx @vscode/vsce package
+# → laravelgo-0.0.1.vsix
+
+code --install-extension laravelgo-0.0.1.vsix
+```
+
+Then reload the window.
+
+No `code` on your `PATH`? Either run **Shell Command: Install 'code' command in PATH** from the Command Palette, or install through the UI: **Extensions** panel → `...` menu → **Install from VSIX...**
+
+- `vsce` may warn about a missing `LICENSE` or `repository` field — answer `y` to continue, or add them.
+- Bump `version` in [package.json](package.json) before repackaging, otherwise VS Code may keep the cached build.
+- Every code change needs a repackage and reinstall.
+
+---
+
+### C — Symlink into the extensions folder (recommended for development)
+
+```bash
+# macOS / Linux
+ln -s "$(pwd)" ~/.vscode/extensions/blinkerboy.laravelgo
+
+# Windows (PowerShell, as Administrator)
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.vscode\extensions\blinkerboy.laravelgo" -Target (Get-Location)
+```
+
+Reload the window (**Developer: Reload Window**) and the extension is active.
+
+The folder name **must** be exactly `blinkerboy.laravelgo` — [src/phpParserUtil.ts](src/phpParserUtil.ts) resolves the bundled `tree-sitter-php_only.wasm` through `vscode.extensions.getExtension('blinkerboy.laravelgo')`. A different name leaves the PHP parser unable to load its grammar and every PHP feature silently stops working.
+
+Development loop:
+
+```bash
+npm run watch       # recompiles on save
+```
+
+then **Developer: Reload Window** to pick up the new build. No repackaging, no version bumps.
+
+**Uninstall:** `rm ~/.vscode/extensions/blinkerboy.laravelgo` — that removes the symlink only, not the repository.
+
+If the extension never shows up in the Extensions list, your VS Code build is skipping symlinked folders; use way B instead.
+
+---
+
+### Which one
+
+| Way | Installs | Repackage per change | Best for |
+|-----|----------|----------------------|----------|
+| A — F5 dev host | No | No (reload dev host) | Quick trial, debugging with breakpoints |
+| B — `.vsix` | Yes | Yes | Using it day to day, sharing the build |
+| C — symlink | Yes | No (reload window) | Ongoing development |
+
+---
+
 ## Requirements
 
 - PHP files must use the `App\Models` namespace for model lenses to activate.
