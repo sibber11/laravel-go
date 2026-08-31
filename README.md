@@ -8,7 +8,7 @@ VS Code extension for navigating Laravel projects. Browse model-related files an
 
 Opens a quick-pick menu listing all files related to an Eloquent model — migrations, factories, seeders, resources, policies, controllers, observers, and form requests.
 
-Activates on any PHP file in the `App\Models` namespace. A CodeLens appears above each model class declaration showing the count of related files found.
+Activates on any PHP file in the `App\Models` or `Modules\{Module}\Models` namespace. A CodeLens appears above each model class declaration showing the count of related files found.
 
 ```
 $(files) 4 related files         ← click to open menu
@@ -31,6 +31,40 @@ Click the lens to choose a file. The selected file opens in a split editor to th
 | Controller | `app/Http/Controllers/**/*{Model}Controller.php` |
 | Observer | `app/Observers/{Model}Observer.php` |
 | Request | `app/Http/Requests/**/{Model}/*Request.php` |
+| Livewire | `app/Livewire/**/{Model}/*.php` |
+| Service | `app/Services/{Model}/*.php`, `app/Services/**/{Model}Service.php` |
+| Enum | `app/Enums/{Model}/*.php` |
+| Export | `app/Exports/{Model}/*.php`, `app/Exports/**/{Model}Export.php` |
+| Import | `app/Imports/**/{Model}Import.php` |
+| Job | `app/Jobs/**/*{Model}*Job.php` |
+
+**Table name resolution** — an explicit `protected $table = '...'` on the model wins over the name derived from the class. This matters for modules, which routinely prefix tables (`Attendance` -> `hrm_attendances`) and for singular pivot tables (`DealUser` -> `crm_deal_user`) that a class-derived name never matches.
+
+Models are read with the bundled tree-sitter PHP grammar, not by regex, so commented-out code, docblocks and string literals never register as classes or table names, and a `$table` declared inside a nested anonymous class is not credited to the model around it.
+
+If `$table` is computed rather than a plain literal (`self::PREFIX . 'notes'`), the class-derived name is used instead and the lens tooltip says so.
+
+---
+
+### Modules
+
+[nwidart/laravel-modules](https://github.com/nWidart/laravel-modules) packages are detected automatically by scanning for `Modules/*/module.json`.
+
+A model in `Modules/HRM/app/Models/Attendance.php` searches **only inside `Modules/HRM/`**. The paths in the table above are resolved relative to the module root, with the `app/` ones relative to the module's PHP source folder:
+
+```
+Modules/HRM/database/migrations/**/*hrm_attendances*.php
+Modules/HRM/app/Http/Resources/**/*AttendanceResource.php
+Modules/HRM/app/Livewire/**/Attendance/*.php
+```
+
+The search never crosses out of the module — a module model will not surface another module's files or the host application's.
+
+Both nwidart layouts work: the modern one with PHP under `Modules/{Module}/app/`, and the legacy one with `Http/`, `Models/` etc. directly in the module root. The layout is detected by probing for the `app/` directory.
+
+Models outside a module keep searching the workspace root exactly as before.
+
+> **Not covered:** Inertia go-to-definition, the missing-component diagnostic, and the Vue page CodeLens still resolve against the root `resources/js/{Module}/Pages/`. Modules are not consulted for Inertia component paths.
 
 ---
 
@@ -101,6 +135,10 @@ Component strings omit the `Pages` directory segment. LaravelGo inserts it autom
 | `modelRelatedFiles.buttonPosition` | string | `"after-class"` | Position of the Related Files button |
 | `modelRelatedFiles.searchDirectories` | string[] | `[".", "./components", ".."]` | Extra directories to search |
 | `modelRelatedFiles.filePatterns` | object | `{}` | Custom file pattern mappings |
+| `modelRelatedFiles.modules.enabled` | boolean | `true` | Detect modules and scope a module model's search to its own module |
+| `modelRelatedFiles.modules.path` | string | `"Modules"` | Directory holding the modules, matching `paths.modules` in `config/modules.php` |
+
+> `searchDirectories`, `filePatterns` and `buttonPosition` are declared in `package.json` but not read by any code yet.
 
 ---
 
@@ -164,7 +202,9 @@ New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.vscode\extensions\blink
 
 Reload the window (**Developer: Reload Window**) and the extension is active.
 
-The folder name **must** be exactly `blinkerboy.laravelgo` — [src/phpParserUtil.ts](src/phpParserUtil.ts) resolves the bundled `tree-sitter-php_only.wasm` through `vscode.extensions.getExtension('blinkerboy.laravelgo')`. A different name leaves the PHP parser unable to load its grammar and every PHP feature silently stops working.
+The folder name does not matter. [src/phpParserUtil.ts](src/phpParserUtil.ts) resolves the bundled `tree-sitter-php_only.wasm` from `context.extensionUri`, so any folder name works.
+
+> Earlier builds looked the extension up by id and broke silently under any other folder name.
 
 Development loop:
 
@@ -192,7 +232,7 @@ If the extension never shows up in the Extensions list, your VS Code build is sk
 
 ## Requirements
 
-- PHP files must use the `App\Models` namespace for model lenses to activate.
+- PHP files must use the `App\Models` or `Modules\{Module}\Models` namespace for model lenses to activate.
 - Inertia navigation requires a Laravel project with Vue pages under `resources/js/{Module}/Pages/`.
 
 ---

@@ -1,15 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { initializeParser, extractComponentsFromPhp, PhpComponentMatch } from './phpParserUtil';
-
-let parserInstance: Awaited<ReturnType<typeof initializeParser>> | null = null;
-
-export async function getParser() {
-    if (!parserInstance) {
-        parserInstance = await initializeParser();
-    }
-    return parserInstance;
-}
+import { extractComponentsFromPhp, PhpComponentMatch } from './phpParserUtil';
 
 export function getComponentRange(document: vscode.TextDocument, match: PhpComponentMatch): vscode.Range {
     const lineContent = document.lineAt(match.line).text;
@@ -34,8 +25,7 @@ export async function extractInertiaComponents(document: vscode.TextDocument) {
     if (!folder) { return []; }
 
     try {
-        const { parser, language } = await getParser();
-        const matches = await extractComponentsFromPhp(document.getText(), parser, language);
+        const matches = await extractComponentsFromPhp(document.getText());
         return matches.filter(m => {
             const parts = m.componentName.split('/');
             return parts.length >= 2;
