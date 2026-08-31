@@ -60,6 +60,16 @@
           ],
           "description": "Additional directories to search for related files."
         },
+        "modelRelatedFiles.modules.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Detect nwidart/laravel-modules packages and scope a module model's related files to its own module."
+        },
+        "modelRelatedFiles.modules.path": {
+          "type": "string",
+          "default": "Modules",
+          "description": "Workspace-relative directory holding the modules, matching paths.modules in config/modules.php."
+        },
         "modelRelatedFiles.filePatterns": {
           "type": "object",
           "default": {},

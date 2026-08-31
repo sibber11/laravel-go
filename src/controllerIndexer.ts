@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 
-import { Parser, Language } from "web-tree-sitter";
-import { initializeParser, extractComponentsFromPhp } from './phpParserUtil';
+import { extractComponentsFromPhp, getParser } from './phpParserUtil';
 
 export interface ComponentSource {
     uri: vscode.Uri;
@@ -20,8 +19,6 @@ export class ControllerIndexer implements vscode.Disposable {
 
     private readonly watcher: vscode.FileSystemWatcher;
     private indexPromise: Promise<void> | null = null;
-    private parser!: Parser;
-    private language!: Language;
 
     constructor() {
         this.watcher = vscode.workspace.createFileSystemWatcher('**/app/Http/Controllers/**/*.php');
@@ -42,9 +39,7 @@ export class ControllerIndexer implements vscode.Disposable {
 
     private async buildFullIndex(): Promise<void> {
         const uris = await vscode.workspace.findFiles('**/app/Http/Controllers/**/*.php', null);
-        const { parser, language } = await initializeParser();
-        this.parser = parser;
-        this.language = language;
+        await getParser();
         await Promise.all(uris.map(uri => this.indexFile(uri)));
         this._onDidUpdate.fire();
     }
@@ -71,7 +66,7 @@ export class ControllerIndexer implements vscode.Disposable {
         try {
             const bytes = await vscode.workspace.fs.readFile(uri);
             const content = new TextDecoder('utf-8').decode(bytes);
-            const matches = await extractComponentsFromPhp(content, this.parser, this.language);
+            const matches = await extractComponentsFromPhp(content);
             matches.forEach((match) => {
                 if (match.className && match.methodName) {
                     this.recordComponent(match.componentName, uri, match.line, match.className, match.methodName);
